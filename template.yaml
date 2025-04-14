@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Lambda function to scrape ECB exchange rates, save to S3 and DynamoDB daily.
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket to store the CSV files.
+  DynamoDBTableName:
+    Type: String
+    Description: Name of the DynamoDB table to store the rates.
+    Default: ECBRatesData # Puedes poner un nombre por defecto
+
+Globals:
+  Function:
+    Timeout: 60 # Segundos
+    MemorySize: 256 # MB
+    Runtime: python3.11 # O la versión que prefieras/necesites
+    Environment:
+      Variables:
+        S3_BUCKET_NAME: !Ref S3BucketName
+        DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+
+Resources:
+  # --- Tabla DynamoDB ---
+  DynamoDBRatesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref DynamoDBTableName
+      AttributeDefinitions:
+        - AttributeName: "Date" # Fecha como clave de partición
+          AttributeType: "S"
+        - AttributeName: "Currency" # Moneda como clave de ordenación
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "Date"
+          KeyType: "HASH" # Partition key
+        - AttributeName: "Currency"
+          KeyType: "RANGE" # Sort key
+      BillingMode: PAY_PER_REQUEST # O PROVISIONED si conoces la carga
+
+  # --- Función Lambda ---
+  ECBRatesScraperFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ecb-rates-scraper-lambda
+      CodeUri: . # Código fuente está en el directorio actual
+      Handler: lambda_function.lambda_handler
+      Policies:
+        # Políticas administradas por AWS para acceso completo
+        - AmazonS3FullAccess
+        - AmazonDynamoDBFullAccess
+        # Es buena práctica restringir más los permisos si es posible
+        # Ejemplo de política más restrictiva (requiere refinar ARNs):
+        # - Statement:
+        #     - Effect: Allow
+        #       Action:
+        #         - s3:PutObject
+        #       Resource: !Sub arn:aws:s3:::${S3BucketName}/ecb_rates/*
+        #     - Effect: Allow
+        #       Action:
+        #         - dynamodb:PutItem
+        #         - dynamodb:BatchWriteItem
+        #       Resource: !GetAtt DynamoDBRatesTable.Arn
+      Events:
+        ScheduledTrigger:
+          Type: Schedule
+          Properties:
+            Schedule: "rate(1 day)" # Ejecutar una vez al día
+            Name: ecb-rates-daily-trigger
+            Description: Triggers the ECB rates scraper lambda daily
+            Enabled: True
+
+Outputs:
+  LambdaFunctionName:
+    Description: "ECB Rates Scraper Lambda Function Name"
+    Value: !Ref ECBRatesScraperFunction
+  DynamoDBTableNameOutput:
+    Description: "DynamoDB Table Name"
+    Value: !Ref DynamoDBTableName
+  DynamoDBTableArn:
+    Description: "DynamoDB Table ARN"
+    Value: !GetAtt DynamoDBRatesTable.Arn
