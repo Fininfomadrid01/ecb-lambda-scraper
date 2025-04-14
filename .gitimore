@@ -4,3 +4,14 @@
         *.egg-info/
         venv/
         .env
+
+arn:aws:iam::797161732660:oidc-provider/token.actions.githubusercontent.com
+
+
+
+
+
+
+
+        git config --global user.name Andres
+git config --global user.email andresiguaz@gmail.com
