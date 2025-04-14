@@ -1,0 +1,55 @@
+        name: Deploy ECB Scraper Lambda
+
+        on:
+          push:
+            branches:
+              - main # Ejecutar en cada push a la rama main
+
+        jobs:
+          deploy:
+            runs-on: ubuntu-latest
+            permissions:
+              id-token: write # Necesario para autenticación OIDC con AWS
+              contents: read
+
+            steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                python-version: '3.11' # Asegúrate que coincida con el runtime de la Lambda
+
+            - name: Install AWS SAM CLI
+              run: pip install aws-sam-cli
+
+            # Configurar credenciales de AWS usando OIDC (Recomendado)
+            # Necesitas configurar un Rol IAM en AWS que confíe en GitHub Actions
+            # y darle los permisos necesarios para desplegar CloudFormation/SAM,
+            # crear Lambdas, roles, tablas DynamoDB, buckets S3, etc.
+            # Reemplaza 'tu-rol-arn-de-aws' con el ARN de tu rol IAM
+            # Reemplaza 'us-east-1' con tu región de AWS
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                role-to-assume: arn:aws:iam::797161732660:oidc-provider/token.actions.githubusercontent.com # ¡¡CAMBIA ESTO!!
+                aws-region: us-east-1 # ¡¡CAMBIA ESTO!!
+
+            # Necesitarás crear estos Secrets en tu repositorio de GitHub:
+            # - AWS_S3_BUCKET_NAME: El nombre de tu bucket S3
+            # - AWS_DYNAMODB_TABLE_NAME: El nombre de tu tabla DynamoDB (o usa el default del template)
+            - name: Build SAM application
+              run: sam build --use-container # --use-container es útil si tienes dependencias complejas
+
+            - name: Deploy SAM application
+              run: |
+                sam deploy \
+                  --stack-name ecb-rates-scraper-stack \
+                  --region ${{ env.AWS_REGION }} \
+                  --capabilities CAPABILITY_IAM \
+                  --resolve-s3 \
+                  --parameter-overrides S3BucketName=${{ secrets.AWS_S3_BUCKET_NAME }} DynamoDBTableName=${{ secrets.AWS_DYNAMODB_TABLE_NAME }} \
+                  --no-fail-on-empty-changeset
+              env:
+                 AWS_REGION: us-east-1 # ¡¡CAMBIA ESTO!!
