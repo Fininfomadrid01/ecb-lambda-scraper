@@ -3,7 +3,7 @@
         on:
           push:
             branches:
-              - main # Ejecutar en cada push a la rama main
+              - master # Ejecutar en cada push a la rama main
 
         jobs:
           deploy:
