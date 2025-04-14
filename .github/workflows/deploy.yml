@@ -33,7 +33,7 @@
             - name: Configure AWS Credentials
               uses: aws-actions/configure-aws-credentials@v4
               with:
-                role-to-assume: arn:aws:iam::797161732660:oidc-provider/token.actions.githubusercontent.com # ¡¡CAMBIA ESTO!!
+                role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_ARN }} # ¡¡CAMBIA ESTO!!
                 aws-region: us-east-1 # ¡¡CAMBIA ESTO!!
 
             # Necesitarás crear estos Secrets en tu repositorio de GitHub:
